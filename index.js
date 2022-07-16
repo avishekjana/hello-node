@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 require("./src/database/connection");
 
 app.use(bodyParser.json());
+app.set("view engine", "ejs");
 
 // Define TODO model
 const Todo = sequelize.define(
@@ -20,6 +21,12 @@ sequelize.sync({ force: true })
 });
 
 // Routes
+app.get("/", (request, response) => {
+  // response.send("<h1>Welcome to your first EJS app!</h1>");
+  response.render("todos"); // index refers to index.ejs
+});
+
+
 app.get('/todos', function (request, response) {
   Todo.findAll().then(todos => response.json(todos));
 })
