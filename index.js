@@ -3,10 +3,12 @@ const bodyParser = require('body-parser');
 const session = require('express-session');  // session middleware
 const passport = require('passport');  // authentication
 const connectEnsureLogin = require('connect-ensure-login'); //authorization
-const bcrypt = require('bcrypt')
 const LocalStrategy = require('passport-local').Strategy
+const bcrypt = require('bcrypt')
 
 const app = express()
+
+const saltRounds = 10;
 
 // Importing models
 const { User, Todo } = require("./models");
@@ -37,10 +39,14 @@ passport.use(new LocalStrategy(
     passwordField: 'password'
   },
   function(username, password, done) {
-    User.findOne({ where: { email: username, password: password } }).then(function(user) {
-      return done(null, user);
+    User.findOne({ where: { email: username } }).then(async function(user) {
+      const cmp = await bcrypt.compare(password, user.password);
+      if (cmp) {
+        return done(null, user);
+      } else {
+        return done("Invalid password");
+      }
     }).catch((error) => {
-      console.log(error);
       return done(err);
     });
   }
@@ -80,21 +86,29 @@ app.get("/signup", (request, response) => {
   response.render("signup");
 });
 app.post('/users', async function (request, response) {
+  const hashedPwd = await bcrypt.hash(request.body.password, saltRounds);
   const user = await User.create({ 
     firstName: request.body.firstName,
     lastName: request.body.lastName,
     email: request.body.email, 
-    password: request.body.password 
+    password: hashedPwd
   }).catch((error) => {
     console.log(error)
   });
-  response.redirect("/todos"); // Redirected to root path
+  // Create session after successful signup
+  request.login(user, function(err) {
+    if (err) {
+      console.log(err);
+    }
+    return response.redirect('/todos');
+  });
+  // response.redirect("/todos"); // Redirected to root path
 })
 
-app.get('/signout', function(req, res, next) {
-  req.logout(function(err) {
+app.get('/signout', function(request, response, next) {
+  request.logout(function(err) {
     if (err) { return next(err); }
-    res.redirect('/');
+    response.redirect('/');
   });
 });
 
@@ -126,4 +140,4 @@ app.put('/todos/:id', connectEnsureLogin.ensureLoggedIn(), function(request, res
   });
 });
 
-app.listen(3001)
+app.listen(3011)
